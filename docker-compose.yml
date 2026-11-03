@@ -1,0 +1,7 @@
+services:
+  gerador-alocacoes:
+    build: .
+    container_name: gerador-alocacoes
+    ports:
+      - "5000:5000"
+    restart: unless-stopped

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gerador de códigos de alocação</title>
+  <style>
+    :root { color-scheme: light; --blue:#174ea6; --bg:#f4f6fa; --line:#dce2ea; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:Arial, sans-serif; background:var(--bg); color:#172033; }
+    main { max-width:1000px; margin:36px auto; padding:0 18px; }
+    .card { background:white; border:1px solid var(--line); border-radius:14px; padding:22px; margin-bottom:18px; box-shadow:0 3px 12px #1522380a; }
+    h1 { margin:0 0 8px; font-size:26px; }
+    h2 { margin-top:0; font-size:19px; }
+    .muted { color:#667085; font-size:14px; line-height:1.5; }
+    textarea { width:100%; min-height:115px; padding:12px; border:1px solid #bfc8d5; border-radius:8px; font:15px monospace; resize:vertical; }
+    button { border:0; border-radius:8px; padding:11px 16px; background:var(--blue); color:white; font-weight:600; cursor:pointer; }
+    button.secondary { background:#e9eef7; color:#183153; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+    .rules { display:flex; gap:9px; flex-wrap:wrap; margin-top:14px; }
+    .tag { background:#eef3fb; border-radius:20px; padding:7px 11px; font-size:13px; }
+    .stats { font-size:30px; font-weight:700; color:var(--blue); }
+    .error { color:#b42318; background:#fff1f0; border:1px solid #ffd2cc; padding:10px; border-radius:8px; margin-top:12px; }
+    .table-wrap { overflow:auto; max-height:480px; border:1px solid var(--line); border-radius:8px; }
+    table { border-collapse:collapse; width:100%; font-size:14px; }
+    th,td { text-align:left; padding:9px 11px; border-bottom:1px solid #edf0f4; white-space:nowrap; }
+    th { background:#f7f9fc; position:sticky; top:0; }
+    code { font-family:Consolas, monospace; }
+    @media (max-width:600px) { main { margin:18px auto; } .card { padding:16px; } h1 { font-size:22px; } }
+  </style>
+</head>
+<body>
+<main>
+  <section class="card">
+    <h1>Gerador de códigos de alocação</h1>
+    <p class="muted">Informe somente os números das salas. O sistema cria automaticamente as combinações de dia, local, sala, horário e sessão.</p>
+    <form method="post">
+      <label for="salas"><strong>Números das salas</strong></label>
+      <p class="muted">Separe por vírgula, espaço, ponto e vírgula ou quebra de linha. Ex.: 315, 120, 012, 025.</p>
+      <textarea id="salas" name="salas" placeholder="315&#10;120&#10;012&#10;025" required>{{ texto_salas }}</textarea>
+      <label for="local"><strong>Local da alocação</strong></label>
+      <p class="muted">Escolha somente um local para gerar os códigos.</p>
+      <select id="local" name="local" required style="padding:10px; border:1px solid #bfc8d5; border-radius:8px; min-width:150px; margin:4px 0 12px;">
+        {% for local in locais %}
+          <option value="{{ local }}" {% if local == local_escolhido %}selected{% endif %}>{{ local }}</option>
+        {% endfor %}
+      </select>
+      <div class="rules">
+        <span class="tag"><strong>Dias:</strong> 23, 24, 25</span>
+        <span class="tag"><strong>Local selecionado:</strong> {{ local_escolhido }}</span>
+        <span class="tag"><strong>Horários:</strong> 08, 10, 13, 16, 19</span>
+        <span class="tag"><strong>Sessões:</strong> A, B, C, D, E</span>
+      </div>
+      <div class="actions"><button type="submit">Gerar códigos</button></div>
+    </form>
+    {% if invalidas %}
+      <div class="error"><strong>Itens inválidos:</strong> {{ invalidas|join(", ") }}. Use apenas números com até três dígitos.</div>
+    {% endif %}
+  </section>
+
+  {% if codigos %}
+  <section class="card">
+    <h2>Resultado</h2>
+    <div class="stats">{{ total }} códigos</div>
+    <p class="muted">{{ salas|length }} sala(s) informada(s). São gerados 75 códigos por sala: 3 dias × 1 local selecionado × 5 horários × 5 sessões.</p>
+    <div class="actions">
+      <button type="button" onclick="copiarCodigos()">Copiar códigos</button>
+      <form method="post" action="/download">
+        <input type="hidden" name="salas" value="{{ texto_salas }}">
+        <input type="hidden" name="local" value="{{ local_escolhido }}">
+        <button class="secondary" type="submit">Baixar CSV</button>
+      </form>
+    </div>
+    <p id="aviso" class="muted" aria-live="polite"></p>
+    <div class="table-wrap">
+      <table id="tabela">
+        <thead><tr><th>Dia</th><th>Local</th><th>Sala</th><th>Horário</th><th>Sessão</th><th>Código</th></tr></thead>
+        <tbody>
+        {% for item in codigos %}
+          <tr>
+            <td>{{ item.dia }}</td><td>{{ item.local }}</td><td>{{ item.sala }}</td>
+            <td>{{ item.horario }}</td><td>{{ item.sessao }}</td><td><code>{{ item.codigo }}</code></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+</main>
+<script>
+function copiarCodigos() {
+  const linhas = Array.from(document.querySelectorAll("#tabela tbody tr"));
+  const texto = linhas.map(linha => linha.cells[5].innerText).join("\\n");
+  navigator.clipboard.writeText(texto).then(() => {
+    document.getElementById("aviso").textContent = "Códigos copiados para a área de transferência.";
+  }).catch(() => {
+    document.getElementById("aviso").textContent = "Não foi possível copiar automaticamente. Selecione e copie a tabela.";
+  });
+}
+</script>
+</body>
+</html>
